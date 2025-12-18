@@ -7,8 +7,19 @@ from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                              classification_report, matthews_corrcoef, cohen_kappa_score)
 import mlflow
 import mlflow.lightgbm
+import dagshub
 import warnings
 warnings.filterwarnings('ignore')
+
+
+# ========== DAGSHUB INTEGRATION ==========
+dagshub.init(repo_owner='anggapradanaa', 
+             repo_name='Membangun_model', 
+             mlflow=True)
+
+# Set MLflow tracking URI ke DagsHub
+mlflow.set_tracking_uri("https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
+# ==========================================
 
 
 def load_data():
@@ -174,14 +185,14 @@ def evaluate_model(model, X_test, y_test):
 
 
 def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y_test):
-    """Manual logging to MLflow"""
+    """Manual logging to MLflow (DagsHub)"""
     print("\n" + "=" * 60)
-    print("Logging to MLflow")
+    print("Logging to MLflow (DagsHub)")
     print("=" * 60)
     
     mlflow.set_experiment("diabetes-lgbm-tuned")
     
-    with mlflow.start_run(run_name="lgbm_tuned_manual"):
+    with mlflow.start_run(run_name="lgbm_tuned_dagshub"):
         print("\nLogging hyperparameters...")
         # Log hyperparameters
         for param, value in best_params.items():
@@ -191,6 +202,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         mlflow.log_param("cv_folds", 5)
         mlflow.log_param("cv_strategy", "StratifiedKFold")
         mlflow.log_param("scoring", "roc_auc")
+        mlflow.log_param("tracking", "DagsHub")
         
         print("Hyperparameters logged")
         
@@ -214,7 +226,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         mlflow.lightgbm.log_model(
             lgb_model=model,
             artifact_path="model",
-            registered_model_name="lgbm_diabetes_tuned"
+            registered_model_name="lgbm_diabetes_tuned_dagshub"
         )
         print("Model logged")
         
@@ -224,7 +236,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         
         print("\nCreating and logging artifacts...")
         
-        # 1. Confusion Matrix
+        # 1. Confusion Matrix PNG
         cm = np.array(metrics['confusion_matrix'])
         plt.figure(figsize=(8, 6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
@@ -236,7 +248,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         plt.savefig('confusion_matrix.png')
         plt.close()
         mlflow.log_artifact('confusion_matrix.png')
-        print("   Confusion matrix logged")
+        print("   Confusion matrix PNG logged")
         
         # 2. Confusion Matrix TXT
         with open('confusion_matrix.txt', 'w') as f:
@@ -249,7 +261,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
             f.write(f"True Positives  (TP): {tp}\n\n")
             f.write(f"Total: {tn + fp + fn + tp}\n")
         mlflow.log_artifact('confusion_matrix.txt')
-        print("   Confusion matrix logged")
+        print("   Confusion matrix TXT logged")
         
         # 3. Classification Report
         y_pred = model.predict(X_test)
@@ -285,7 +297,7 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         plt.savefig('feature_importance_gain.png', dpi=100, bbox_inches='tight')
         plt.close()
         mlflow.log_artifact('feature_importance_gain.png')
-        print("   Feature importance (gain) PNG logged")
+        print("   ✓ Feature importance (gain) PNG logged")
         
         # 6. Feature Importance SPLIT - JSON
         feature_importance_split = pd.DataFrame({
@@ -331,9 +343,14 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         print("   CV results summary logged")
         
         run_id = mlflow.active_run().info.run_id
-        print(f"\nMLflow logging completed!")
-        print(f"   Run ID: {run_id}")
-        print(f"   Total artifacts logged: 8 files")
+        print(f"\n{'='*60}")
+        print(f"MLflow logging to DagsHub completed!")
+        print(f"{'='*60}")
+        print(f"Run ID: {run_id}")
+        print(f"Total artifacts logged: 8 files (BEYOND AUTOLOG)")
+        print(f"\nView in DagsHub:")
+        print(f"https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
+        print(f"{'='*60}")
         
         return run_id
 
@@ -342,6 +359,7 @@ def main():
     """Main training pipeline with tuning"""
     print("\n" + "=" * 60)
     print("MODELLING WITH HYPERPARAMETER TUNING")
+    print("TRACKING: DAGSHUB")
     print("=" * 60)
     print("Author: Angga Yulian Adi Pradana")
     print("=" * 60)
@@ -355,7 +373,7 @@ def main():
     # Evaluate model
     metrics = evaluate_model(best_model, X_test, y_test)
     
-    # Log to MLflow
+    # Log to MLflow (DagsHub)
     run_id = log_to_mlflow(best_model, best_params, best_cv_score, metrics, 
                            X_train, X_test, y_test)
     
@@ -364,9 +382,10 @@ def main():
     print("=" * 60)
     print("\nSUMMARY:")
     print("  Hyperparameter tuning completed (GridSearchCV)")
-    print("  Class imbalance handled (class_weight='balanced', StratifiedKFold, SMOTE)")
     print("  Best model selected and evaluated")
-    print("  All metrics calculated:")
+    print("  Manual logging to DagsHub completed")
+    print(f" MLflow Run ID: {run_id}")
+    print("\n  All metrics calculated:")
     print(f"     - Accuracy:   {metrics['accuracy']:.4f}")
     print(f"     - Precision:  {metrics['precision']:.4f}")
     print(f"     - Recall:     {metrics['recall']:.4f}")
@@ -375,9 +394,17 @@ def main():
     print(f"     - Specificity: {metrics['specificity']:.4f}")
     print(f"     - MCC:        {metrics['mcc']:.4f}")
     print(f"     - Cohen Kappa: {metrics['cohen_kappa']:.4f}")
-    print("  Manual logging to MLflow completed")
-    print(f" MLflow Run ID: {run_id}")
-    print("\nView results: mlflow ui")
+    print("\n  Artifacts logged (8 files):")
+    print("     1. confusion_matrix.png")
+    print("     2. confusion_matrix.txt")
+    print("     3. classification_report.txt")
+    print("     4. feature_importance_gain.json")
+    print("     5. feature_importance_gain.png")
+    print("     6. feature_importance_split.json")
+    print("     7. feature_importance_split.png")
+    print("     8. cv_results_summary.txt")
+    print("\n  View in DagsHub:")
+    print("  https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
     print("=" * 60)
 
 
