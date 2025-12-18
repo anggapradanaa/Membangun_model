@@ -1,0 +1,5 @@
+DagsHub Repository:https://dagshub.com/anggapradanaa/Membangun_model
+MLflow Tracking UI:https://dagshub.com/anggapradanaa/Membangun_model.mlflow
+MLflow Experiments:https://dagshub.com/anggapradanaa/Membangun_model.mlflow/#/experiments
+Experiment - Baseline (Autolog):https://dagshub.com/anggapradanaa/Membangun_model.mlflow/#/experiments/1
+Experiment - Tuned (Manual Logging):https://dagshub.com/anggapradanaa/Membangun_model.mlflow/#/experiments/0
