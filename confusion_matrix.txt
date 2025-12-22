@@ -1,9 +1,0 @@
-Confusion Matrix
-==================================================
-
-True Negatives  (TN): 75
-False Positives (FP): 25
-False Negatives (FN): 11
-True Positives  (TP): 43
-
-Total: 154
