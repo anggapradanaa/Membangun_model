@@ -1,0 +1,10 @@
+artifact_location: file:///D:/Perkuliahan/Asah led by Dicoding/SMSML_Angga-Yulian-Adi-Pradana/Membangun_model/mlruns/690702896899526055/models/m-d32f62e72fb5430fb289fcc4d1d19873/artifacts
+creation_timestamp: 1766384512933
+experiment_id: '690702896899526055'
+last_updated_timestamp: 1766384524674
+model_id: m-d32f62e72fb5430fb289fcc4d1d19873
+model_type: null
+name: model
+source_run_id: 54e4f298c6fe4456adc267bda5dde1d8
+status: 2
+status_message: null

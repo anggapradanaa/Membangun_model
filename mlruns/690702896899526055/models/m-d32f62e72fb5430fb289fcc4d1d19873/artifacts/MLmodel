@@ -1,0 +1,22 @@
+artifact_path: file:///D:/Perkuliahan/Asah led by Dicoding/SMSML_Angga-Yulian-Adi-Pradana/Membangun_model/mlruns/690702896899526055/models/m-d32f62e72fb5430fb289fcc4d1d19873/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.10.0
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.7.2
+mlflow_version: 3.8.0
+model_id: m-d32f62e72fb5430fb289fcc4d1d19873
+model_size_bytes: 2034213
+model_uuid: m-d32f62e72fb5430fb289fcc4d1d19873
+prompts: null
+run_id: 54e4f298c6fe4456adc267bda5dde1d8
+utc_time_created: '2025-12-22 06:21:53.032792'
