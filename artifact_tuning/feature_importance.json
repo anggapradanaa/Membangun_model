@@ -1,0 +1,34 @@
+[
+  {
+    "feature":"Glucose",
+    "importance":0.2759667099
+  },
+  {
+    "feature":"BMI",
+    "importance":0.1809219281
+  },
+  {
+    "feature":"Age",
+    "importance":0.1296060191
+  },
+  {
+    "feature":"DiabetesPedigreeFunction",
+    "importance":0.1102763898
+  },
+  {
+    "feature":"Pregnancies",
+    "importance":0.0847466655
+  },
+  {
+    "feature":"BloodPressure",
+    "importance":0.0819595942
+  },
+  {
+    "feature":"SkinThickness",
+    "importance":0.0737984265
+  },
+  {
+    "feature":"Insulin",
+    "importance":0.0627242669
+  }
+]

@@ -1,0 +1,19 @@
+Random Forest Tree Statistics
+==================================================
+
+Number of Trees: 100
+Number of Features: 8
+Number of Classes: 2
+Out-of-Bag Score: N/A
+
+Tree Depth Statistics:
+   Min Depth: 10
+   Max Depth: 10
+   Mean Depth: 10.00
+   Median Depth: 10.00
+
+Number of Leaves Statistics:
+   Min Leaves: 73
+   Max Leaves: 120
+   Mean Leaves: 101.03
+   Median Leaves: 100.00

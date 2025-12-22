@@ -1,0 +1,16 @@
+Cross-Validation & Test Results Summary
+Model: Random Forest with Hyperparameter Tuning
+==================================================
+
+Best CV ROC-AUC Score: 0.8930
+
+Test Set Metrics:
+--------------------------------------------------
+Accuracy:      0.7273
+Precision:     0.5909
+Recall:        0.7222
+F1-Score:      0.6500
+AUC-ROC:       0.8172
+Specificity:   0.7300
+MCC:           0.4360
+Cohen's Kappa: 0.4302

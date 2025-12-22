@@ -1,0 +1,9 @@
+Confusion Matrix - Random Forest
+==================================================
+
+True Negatives  (TN): 73
+False Positives (FP): 27
+False Negatives (FN): 15
+True Positives  (TP): 39
+
+Total: 154
