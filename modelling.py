@@ -3,20 +3,18 @@ import numpy as np
 from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 import mlflow
-import mlflow.lightgbm
 import dagshub
 import warnings
 warnings.filterwarnings('ignore')
 
 
-# ========== DAGSHUB INTEGRATION ==========
+# DAGSHUB INTEGRATION
 dagshub.init(repo_owner='anggapradanaa', 
              repo_name='Membangun_model', 
              mlflow=True)
 
 # Set MLflow tracking URI ke DagsHub
 mlflow.set_tracking_uri("https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
-# ==========================================
 
 
 def load_data():
@@ -51,14 +49,14 @@ def train_model_autolog(X_train, X_test, y_train, y_test):
     print("Training LightGBM Model (Baseline - MLflow Autolog)")
     print("=" * 60)
     
-    # Start MLflow run
+    # Set experiment
     mlflow.set_experiment("diabetes-lgbm-baseline")
     
     # Enable autolog
-    mlflow.lightgbm.autolog()
+    mlflow.autolog()
     
     with mlflow.start_run(run_name="lgbm_baseline_dagshub"):
-        print("\nMLflow Autolog Enabled")
+        print("\nMLflow Autolog Enabled (General)")
         print("   - Automatically logs: parameters, metrics, model, signature")
         print("   - Tracking: DagsHub")
         
@@ -68,7 +66,6 @@ def train_model_autolog(X_train, X_test, y_train, y_test):
         print(f"   - Class 0 (No Diabetes): {counts[0]} ({counts[0]/len(y_train)*100:.1f}%)")
         print(f"   - Class 1 (Diabetes): {counts[1]} ({counts[1]/len(y_train)*100:.1f}%)")
         print(f"   - Total samples: {len(y_train)}")
-        print(f"   - No additional class weighting needed (data already balanced)")
         
         # Initialize model
         model = LGBMClassifier(
@@ -101,14 +98,6 @@ def train_model_autolog(X_train, X_test, y_train, y_test):
         f1 = f1_score(y_test, y_pred)
         auc = roc_auc_score(y_test, y_pred_proba)
         
-        # Manual log metrics
-        mlflow.log_metric("test_accuracy", accuracy)
-        mlflow.log_metric("test_precision", precision)
-        mlflow.log_metric("test_recall", recall)
-        mlflow.log_metric("test_f1_score", f1)
-        mlflow.log_metric("test_auc_roc", auc)
-        mlflow.log_param("tracking", "DagsHub")
-
         # Print metrics
         print("\nModel Performance (Baseline):")
         print(f"   Accuracy:  {accuracy:.4f}")
@@ -156,7 +145,7 @@ def main():
     print("\nSUMMARY:")
     print("  LightGBM model trained (baseline)")
     print("  Class imbalance handled (SMOTE)")
-    print("  MLflow autolog enabled")
+    print("  MLflow autolog enabled (general)")
     print("  Logged to DagsHub")
     print("  Metrics logged automatically:")
     print(f"     - Accuracy:  {metrics['accuracy']:.4f}")
