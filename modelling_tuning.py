@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from lightgbm import LGBMClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
                              f1_score, roc_auc_score, confusion_matrix, 
                              classification_report, matthews_corrcoef, cohen_kappa_score)
 import mlflow
-import mlflow.lightgbm
+import mlflow.sklearn
 import dagshub
 import warnings
 warnings.filterwarnings('ignore')
@@ -61,15 +61,12 @@ def tune_hyperparameters(X_train, y_train):
     print(f"   - Class 1: {counts[1]} ({counts[1]/len(y_train)*100:.1f}%)")
 
     param_grid = {
-        'n_estimators': [40, 50, 60],
-        'max_depth': [2, 3],
-        'learning_rate': [0.12, 0.15, 0.18],
-        'num_leaves': [10, 15, 20],
-        'min_child_samples': [25, 30, 35],
-        'subsample': [0.95, 1.0],
-        'colsample_bytree': [0.95, 1.0],
-        'reg_alpha': [0, 0.01],
-        'reg_lambda': [0, 0.01]
+        'n_estimators': [50, 100],
+        'max_depth': [5, 10],
+        'min_samples_split': [2, 5],
+        'min_samples_leaf': [1, 2],
+        'max_features': ['sqrt'],
+        'class_weight': [None, 'balanced']
     }
     
     print("\nParameter Grid:")
@@ -79,9 +76,9 @@ def tune_hyperparameters(X_train, y_train):
         total_combinations *= len(values)
     
     # Initialize base model
-    base_model = LGBMClassifier(
+    base_model = RandomForestClassifier(
         random_state=42,
-        verbose=-1
+        n_jobs=-1
     )
     
     # Use StratifiedKFold
@@ -127,6 +124,7 @@ def tune_hyperparameters(X_train, y_train):
         print(f"   Good generalization")
     
     return grid_search.best_estimator_, grid_search.best_params_, grid_search.best_score_
+
 
 def evaluate_model(model, X_test, y_test):
     """Evaluate model dan calculate all metrics"""
@@ -190,14 +188,21 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
     print("Logging to MLflow (DagsHub)")
     print("=" * 60)
     
-    mlflow.set_experiment("diabetes-lgbm-tuned")
+    # Create artifact directory
+    import os
+    artifact_dir = 'artifact_tuning'
+    if not os.path.exists(artifact_dir):
+        os.makedirs(artifact_dir)
+        print(f"\n✓ Created directory: {artifact_dir}/")
     
-    with mlflow.start_run(run_name="lgbm_tuned_dagshub"):
+    mlflow.set_experiment("diabetes-rf-tuned")
+    
+    with mlflow.start_run(run_name="rf_tuned_dagshub"):
         print("\nLogging hyperparameters...")
         # Log hyperparameters
         for param, value in best_params.items():
             mlflow.log_param(param, value)
-        mlflow.log_param("model_type", "LightGBM")
+        mlflow.log_param("model_type", "RandomForest")
         mlflow.log_param("tuning_method", "GridSearchCV")
         mlflow.log_param("cv_folds", 5)
         mlflow.log_param("cv_strategy", "StratifiedKFold")
@@ -223,10 +228,10 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         print("All metrics logged")
         
         print("\nLogging model...")
-        mlflow.lightgbm.log_model(
-            lgb_model=model,
+        mlflow.sklearn.log_model(
+            sk_model=model,
             artifact_path="model",
-            registered_model_name="lgbm_diabetes_tuned_dagshub"
+            registered_model_name="rf_diabetes_tuned_dagshub"
         )
         print("Model logged")
         
@@ -242,17 +247,19 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
                    xticklabels=['No Diabetes', 'Diabetes'],
                    yticklabels=['No Diabetes', 'Diabetes'])
-        plt.title('Confusion Matrix')
+        plt.title('Confusion Matrix - Random Forest')
         plt.ylabel('True Label')
         plt.xlabel('Predicted Label')
-        plt.savefig('confusion_matrix.png')
+        confusion_matrix_path = os.path.join(artifact_dir, 'confusion_matrix.png')
+        plt.savefig(confusion_matrix_path)
         plt.close()
-        mlflow.log_artifact('confusion_matrix.png')
-        print("   Confusion matrix PNG logged")
+        mlflow.log_artifact(confusion_matrix_path)
+        print("   ✓ Confusion matrix PNG logged")
         
         # 2. Confusion Matrix TXT
-        with open('confusion_matrix.txt', 'w') as f:
-            f.write("Confusion Matrix\n")
+        confusion_matrix_txt_path = os.path.join(artifact_dir, 'confusion_matrix.txt')
+        with open(confusion_matrix_txt_path, 'w') as f:
+            f.write("Confusion Matrix - Random Forest\n")
             f.write("=" * 50 + "\n\n")
             tn, fp, fn, tp = cm.ravel()
             f.write(f"True Negatives  (TN): {tn}\n")
@@ -260,73 +267,95 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
             f.write(f"False Negatives (FN): {fn}\n")
             f.write(f"True Positives  (TP): {tp}\n\n")
             f.write(f"Total: {tn + fp + fn + tp}\n")
-        mlflow.log_artifact('confusion_matrix.txt')
-        print("   Confusion matrix TXT logged")
+        mlflow.log_artifact(confusion_matrix_txt_path)
+        print("   ✓ Confusion matrix TXT logged")
         
         # 3. Classification Report
         y_pred = model.predict(X_test)
         report_text = classification_report(y_test, y_pred, 
                                            target_names=['No Diabetes', 'Diabetes'])
-        with open('classification_report.txt', 'w') as f:
-            f.write("Classification Report\n")
+        classification_report_path = os.path.join(artifact_dir, 'classification_report.txt')
+        with open(classification_report_path, 'w') as f:
+            f.write("Classification Report - Random Forest\n")
             f.write("=" * 50 + "\n\n")
             f.write(report_text)
-        mlflow.log_artifact('classification_report.txt')
-        print("   Classification report logged")
+        mlflow.log_artifact(classification_report_path)
+        print("   ✓ Classification report logged")
         
-        # 4. Feature Importance GAIN - JSON
-        feature_importance_gain = pd.DataFrame({
+        # 4. Feature Importance - JSON
+        feature_importance = pd.DataFrame({
             'feature': X_train.columns,
             'importance': model.feature_importances_
         }).sort_values('importance', ascending=False)
         
-        feature_importance_gain.to_json('feature_importance_gain.json', 
-                                        orient='records', indent=2)
-        mlflow.log_artifact('feature_importance_gain.json')
-        print("   Feature importance (gain) JSON logged")
+        feature_importance_json_path = os.path.join(artifact_dir, 'feature_importance.json')
+        feature_importance.to_json(feature_importance_json_path, 
+                                   orient='records', indent=2)
+        mlflow.log_artifact(feature_importance_json_path)
+        print("   ✓ Feature importance JSON logged")
         
-        # 5. Feature Importance GAIN - PNG
+        # 5. Feature Importance - PNG
         plt.figure(figsize=(10, 8))
-        top_features = feature_importance_gain.head(20)
+        top_features = feature_importance.head(20)
         plt.barh(range(len(top_features)), top_features['importance'])
         plt.yticks(range(len(top_features)), top_features['feature'])
-        plt.xlabel('Importance (Gain)')
-        plt.title('Top 20 Feature Importances (Gain)')
+        plt.xlabel('Importance (Gini)')
+        plt.title('Top 20 Feature Importances - Random Forest')
         plt.gca().invert_yaxis()
         plt.tight_layout()
-        plt.savefig('feature_importance_gain.png', dpi=100, bbox_inches='tight')
+        feature_importance_png_path = os.path.join(artifact_dir, 'feature_importance.png')
+        plt.savefig(feature_importance_png_path, dpi=100, bbox_inches='tight')
         plt.close()
-        mlflow.log_artifact('feature_importance_gain.png')
-        print("   ✓ Feature importance (gain) PNG logged")
+        mlflow.log_artifact(feature_importance_png_path)
+        print("   ✓ Feature importance PNG logged")
         
-        # 6. Feature Importance SPLIT - JSON
-        feature_importance_split = pd.DataFrame({
-            'feature': X_train.columns,
-            'importance': model.booster_.feature_importance(importance_type='split')
-        }).sort_values('importance', ascending=False)
+        # 6. ROC Curve - PNG (ARTEFAK TAMBAHAN #1)
+        from sklearn.metrics import roc_curve, auc
+        y_pred_proba = model.predict_proba(X_test)[:, 1]
+        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+        roc_auc = auc(fpr, tpr)
         
-        feature_importance_split.to_json('feature_importance_split.json', 
-                                         orient='records', indent=2)
-        mlflow.log_artifact('feature_importance_split.json')
-        print("   Feature importance (split) JSON logged")
-        
-        # 7. Feature Importance SPLIT - PNG
-        plt.figure(figsize=(10, 8))
-        top_features_split = feature_importance_split.head(20)
-        plt.barh(range(len(top_features_split)), top_features_split['importance'])
-        plt.yticks(range(len(top_features_split)), top_features_split['feature'])
-        plt.xlabel('Importance (Split)')
-        plt.title('Top 20 Feature Importances (Split)')
-        plt.gca().invert_yaxis()
-        plt.tight_layout()
-        plt.savefig('feature_importance_split.png', dpi=100, bbox_inches='tight')
+        plt.figure(figsize=(8, 6))
+        plt.plot(fpr, tpr, color='darkorange', lw=2, 
+                label=f'ROC curve (AUC = {roc_auc:.4f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC) Curve')
+        plt.legend(loc="lower right")
+        plt.grid(alpha=0.3)
+        roc_curve_path = os.path.join(artifact_dir, 'roc_curve.png')
+        plt.savefig(roc_curve_path, dpi=100, bbox_inches='tight')
         plt.close()
-        mlflow.log_artifact('feature_importance_split.png')
-        print("   Feature importance (split) PNG logged")
+        mlflow.log_artifact(roc_curve_path)
+        print("   ✓ ROC curve PNG logged (EXTRA ARTIFACT #1)")
+        
+        # 7. Precision-Recall Curve - PNG (ARTEFAK TAMBAHAN #2)
+        from sklearn.metrics import precision_recall_curve, average_precision_score
+        precision_vals, recall_vals, _ = precision_recall_curve(y_test, y_pred_proba)
+        avg_precision = average_precision_score(y_test, y_pred_proba)
+        
+        plt.figure(figsize=(8, 6))
+        plt.plot(recall_vals, precision_vals, color='blue', lw=2,
+                label=f'PR curve (AP = {avg_precision:.4f})')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curve')
+        plt.legend(loc="lower left")
+        plt.grid(alpha=0.3)
+        pr_curve_path = f'{artifact_dir}/precision_recall_curve.png'
+        plt.savefig(pr_curve_path, dpi=100, bbox_inches='tight')
+        plt.close()
+        mlflow.log_artifact(pr_curve_path)
+        print("   ✓ Precision-Recall curve PNG logged (EXTRA ARTIFACT #2)")
         
         # 8. CV Results Summary
-        with open('cv_results_summary.txt', 'w') as f:
+        cv_results_path = f'{artifact_dir}/cv_results_summary.txt'
+        with open(cv_results_path, 'w') as f:
             f.write("Cross-Validation & Test Results Summary\n")
+            f.write("Model: Random Forest with Hyperparameter Tuning\n")
             f.write("=" * 50 + "\n\n")
             f.write(f"Best CV ROC-AUC Score: {best_cv_score:.4f}\n\n")
             f.write("Test Set Metrics:\n")
@@ -339,15 +368,49 @@ def log_to_mlflow(model, best_params, best_cv_score, metrics, X_train, X_test, y
             f.write(f"Specificity:   {metrics['specificity']:.4f}\n")
             f.write(f"MCC:           {metrics['mcc']:.4f}\n")
             f.write(f"Cohen's Kappa: {metrics['cohen_kappa']:.4f}\n")
-        mlflow.log_artifact('cv_results_summary.txt')
-        print("   CV results summary logged")
+        mlflow.log_artifact(cv_results_path)
+        print("   ✓ CV results summary logged")
+        
+        # 9. Tree Statistics - TXT (ARTEFAK TAMBAHAN #3)
+        tree_stats_path = f'{artifact_dir}/tree_statistics.txt'
+        with open(tree_stats_path, 'w') as f:
+            f.write("Random Forest Tree Statistics\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Number of Trees: {model.n_estimators}\n")
+            f.write(f"Number of Features: {model.n_features_in_}\n")
+            f.write(f"Number of Classes: {model.n_classes_}\n")
+            f.write(f"Out-of-Bag Score: {model.oob_score_ if hasattr(model, 'oob_score_') else 'N/A'}\n\n")
+            
+            # Tree depths
+            tree_depths = [tree.get_depth() for tree in model.estimators_]
+            f.write("Tree Depth Statistics:\n")
+            f.write(f"   Min Depth: {np.min(tree_depths)}\n")
+            f.write(f"   Max Depth: {np.max(tree_depths)}\n")
+            f.write(f"   Mean Depth: {np.mean(tree_depths):.2f}\n")
+            f.write(f"   Median Depth: {np.median(tree_depths):.2f}\n\n")
+            
+            # Number of leaves
+            n_leaves = [tree.get_n_leaves() for tree in model.estimators_]
+            f.write("Number of Leaves Statistics:\n")
+            f.write(f"   Min Leaves: {np.min(n_leaves)}\n")
+            f.write(f"   Max Leaves: {np.max(n_leaves)}\n")
+            f.write(f"   Mean Leaves: {np.mean(n_leaves):.2f}\n")
+            f.write(f"   Median Leaves: {np.median(n_leaves):.2f}\n")
+        mlflow.log_artifact(tree_stats_path)
+        print("   ✓ Tree statistics logged (EXTRA ARTIFACT #3)")
         
         run_id = mlflow.active_run().info.run_id
         print(f"\n{'='*60}")
         print(f"MLflow logging to DagsHub completed!")
         print(f"{'='*60}")
         print(f"Run ID: {run_id}")
-        print(f"Total artifacts logged: 8 files (BEYOND AUTOLOG)")
+        print(f"Artifacts saved to: {artifact_dir}/")
+        print(f"Total artifacts logged: 9 files")
+        print(f"   • Standard artifacts: 6 files")
+        print(f"   • Extra artifacts (beyond autolog): 3 files")
+        print(f"     1. ROC Curve PNG")
+        print(f"     2. Precision-Recall Curve PNG")
+        print(f"     3. Tree Statistics TXT")
         print(f"\nView in DagsHub:")
         print(f"https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
         print(f"{'='*60}")
@@ -359,6 +422,7 @@ def main():
     """Main training pipeline with tuning"""
     print("\n" + "=" * 60)
     print("MODELLING WITH HYPERPARAMETER TUNING")
+    print("MODEL: RANDOM FOREST")
     print("TRACKING: DAGSHUB")
     print("=" * 60)
     print("Author: Angga Yulian Adi Pradana")
@@ -381,28 +445,29 @@ def main():
     print("TUNING & MODELLING COMPLETED!")
     print("=" * 60)
     print("\nSUMMARY:")
-    print("  Hyperparameter tuning completed (GridSearchCV)")
-    print("  Best model selected and evaluated")
-    print("  Manual logging to DagsHub completed")
-    print(f" MLflow Run ID: {run_id}")
+    print("  ✓ Hyperparameter tuning completed (GridSearchCV)")
+    print("  ✓ Best Random Forest model selected and evaluated")
+    print("  ✓ Manual logging to DagsHub completed")
+    print(f"  ✓ MLflow Run ID: {run_id}")
     print("\n  All metrics calculated:")
-    print(f"     - Accuracy:   {metrics['accuracy']:.4f}")
-    print(f"     - Precision:  {metrics['precision']:.4f}")
-    print(f"     - Recall:     {metrics['recall']:.4f}")
-    print(f"     - F1-Score:   {metrics['f1_score']:.4f}")
-    print(f"     - AUC-ROC:    {metrics['auc_roc']:.4f}")
+    print(f"     - Accuracy:    {metrics['accuracy']:.4f}")
+    print(f"     - Precision:   {metrics['precision']:.4f}")
+    print(f"     - Recall:      {metrics['recall']:.4f}")
+    print(f"     - F1-Score:    {metrics['f1_score']:.4f}")
+    print(f"     - AUC-ROC:     {metrics['auc_roc']:.4f}")
     print(f"     - Specificity: {metrics['specificity']:.4f}")
-    print(f"     - MCC:        {metrics['mcc']:.4f}")
+    print(f"     - MCC:         {metrics['mcc']:.4f}")
     print(f"     - Cohen Kappa: {metrics['cohen_kappa']:.4f}")
-    print("\n  Artifacts logged (8 files):")
+    print("\n  Artifacts logged (9 files):")
     print("     1. confusion_matrix.png")
     print("     2. confusion_matrix.txt")
     print("     3. classification_report.txt")
-    print("     4. feature_importance_gain.json")
-    print("     5. feature_importance_gain.png")
-    print("     6. feature_importance_split.json")
-    print("     7. feature_importance_split.png")
-    print("     8. cv_results_summary.txt")
+    print("     4. feature_importance.json")
+    print("     5. feature_importance.png")
+    print("     6. roc_curve.png (EXTRA)")
+    print("     7. precision_recall_curve.png (EXTRA)")
+    print("     8. tree_statistics.txt (EXTRA)")
+    print("     9. cv_results_summary.txt")
     print("\n  View in DagsHub:")
     print("  https://dagshub.com/anggapradanaa/Membangun_model.mlflow")
     print("=" * 60)
